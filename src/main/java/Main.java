@@ -15,24 +15,39 @@ public class Main {
     public static void main(String[] args) throws ExecutionException, InterruptedException, UaException {
         //This will get all endpoints
         System.out.println("\n\nENDPOINTS:");
-        List<EndpointDescription> endpoints = DiscoveryClient.getEndpoints("opc.tcp://192.168.56.10:4840").get();
+        List<EndpointDescription> endpoints = DiscoveryClient.getEndpoints("opc.tcp://opcua.123mc.com:4840/").get();
         System.out.println("Number of endpoints = " + endpoints.size());
         endpoints.stream().forEach(System.out::println);
 
         //Endpoints parameters
-        EndpointDescription firstEndpoint = endpoints.get(0);
-        System.out.println("EndpoitUrl: "+firstEndpoint.getEndpointUrl());
-        System.out.println("ServerCertificate: "+firstEndpoint.getServerCertificate()); //For security
-        System.out.println("SecurityPolicyUri: "+firstEndpoint.getSecurityPolicyUri()); //For security
-        System.out.println("SecurityMode: "+firstEndpoint.getSecurityMode()); //For security
-        System.out.println("UserIdentityTokens: "+firstEndpoint.getUserIdentityTokens());
+        EndpointDescription oneOfEndpoints = endpoints.get(6);
+        System.out.println("EndpoitUrl: "+oneOfEndpoints.getEndpointUrl());
+        System.out.println("ServerCertificate: "+oneOfEndpoints.getServerCertificate()); //For security
+        System.out.println("SecurityPolicyUri: "+oneOfEndpoints.getSecurityPolicyUri()); //For security
+        System.out.println("SecurityMode: "+oneOfEndpoints.getSecurityMode()); //For security
+        System.out.println("UserIdentityTokens: "+oneOfEndpoints.getUserIdentityTokens());
         System.out.println();
 
-        //select endpoint
+        //select endpoint and configure connection
         OpcUaClientConfigBuilder cfg = new OpcUaClientConfigBuilder();
-        cfg.setEndpoint(endpoints.get(0));
+        cfg.setEndpoint(oneOfEndpoints);
         OpcUaClient client = OpcUaClient.create(cfg.build());
         client.connect().get();
+
+        //Browse nodes
+        System.out.println("BROWSE NODES:");
+        client.getAddressSpace().browse(Identifiers.RootFolder).get() //known NodeIds
+                .stream()
+                .map(Node::getBrowseName)
+                .forEach(name -> {
+                    try {
+                        System.out.println(name.get());
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    } catch (ExecutionException e) {
+                        e.printStackTrace();
+                    }
+                });
 
         //Prints serial number
         System.out.println("SERIAL NUMBER:");
@@ -44,19 +59,6 @@ public class Main {
         //Program is running and this is done when the value is ready
         client.readValue(0, TimestampsToReturn.Both,new NodeId(3,"SerialNumber")).thenAccept(System.out::println);
 
-        //Browse nodes
-        System.out.println("BROWSE NODES:");
-        client.getAddressSpace().browse(Identifiers.RootFolder).get() //known NodeIds
-            .stream()
-            .map(Node::getBrowseName)
-            .forEach(name -> {
-                try {
-                    System.out.println(name.get());
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                } catch (ExecutionException e) {
-                    e.printStackTrace();
-                }
-            });
+
     }
 }
