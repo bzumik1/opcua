@@ -1,3 +1,4 @@
+import jdk.swing.interop.SwingInterOpUtils;
 import org.eclipse.milo.opcua.sdk.client.OpcUaClient;
 import org.eclipse.milo.opcua.sdk.client.OpcUaSession;
 import org.eclipse.milo.opcua.sdk.client.api.config.OpcUaClientConfig;
@@ -18,6 +19,7 @@ import org.eclipse.milo.opcua.stack.core.types.structured.MonitoredItemCreateReq
 import org.eclipse.milo.opcua.stack.core.types.structured.MonitoringParameters;
 import org.eclipse.milo.opcua.stack.core.types.structured.ReadValueId;
 
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -31,7 +33,7 @@ public class Main {
     public static void main(String[] args) throws ExecutionException, InterruptedException, UaException {
         //This will get all endpoints
         System.out.println("\n\nENDPOINTS:");
-        List<EndpointDescription> endpoints = DiscoveryClient.getEndpoints("opc.tcp://opcuademo.sterfive.com:26543").get();
+        List<EndpointDescription> endpoints = DiscoveryClient.getEndpoints("opc.tcp://uademo.prosysopc.com:53530/OPCUA/SimulationServer").get();
         System.out.println("Number of endpoints = " + endpoints.size());
         endpoints.stream().forEach(System.out::println);
         System.out.println();
@@ -57,13 +59,37 @@ public class Main {
                                                     .setRequestTimeout(uint(5000))
                                                     .build();
         OpcUaClient client = OpcUaClient.create(opcUaConfiguration);
-        client.connect().get();
-        System.out.println();
+        //CONNECTING
+        System.out.println("CONNECTING:");
+        long startConnection;
+        long endConnection;
+        float timeDifference;
+        OpcUaSession opcUaSession;
 
-        //Session
-        System.out.println("SESSION:");
-        OpcUaSession opcUaSession = client.getSession().get();
-        System.out.println(opcUaSession);
+        startConnection = System.currentTimeMillis();
+        client.connect().get(); // only one connection is possible !!!
+        endConnection= System.currentTimeMillis();
+        timeDifference = (float)(endConnection- startConnection)/1000;
+        opcUaSession = client.getSession().get();
+        System.out.println("First connection took: "+ timeDifference +" s. And SESSION ID is " + opcUaSession.getSessionId());
+
+        startConnection = System.currentTimeMillis();
+        client.connect().get(); // only one connection is possible !!!
+        endConnection= System.currentTimeMillis();
+        timeDifference = (float)(endConnection- startConnection)/1000;
+        opcUaSession = client.getSession().get();
+        System.out.println("Second connection took: "+ timeDifference +" s. And SESSION ID is " + opcUaSession.getSessionId());
+
+        //DISCONNECTING
+        client.disconnect().get();
+
+        startConnection = System.currentTimeMillis();
+        client.connect().get(); // only one connection is possible !!!
+        endConnection= System.currentTimeMillis();
+        timeDifference = (float)(endConnection- startConnection)/1000;
+        opcUaSession = client.getSession().get();
+        System.out.println("Third connection took: "+ timeDifference +" s. And SESSION ID is " + opcUaSession.getSessionId());
+
 
 
         System.out.println();
@@ -105,15 +131,25 @@ public class Main {
 
 
 
-        //Read/write values
-        nodeId = new NodeId(3,"Scalar_Static_Boolean");
+        //NODES
+        NodeId booleanNode = new NodeId(6,"Boolean");
+        NodeId arrayOfFloatNode = new NodeId(6,"FloatAnalogItemArray");
 
-        //Read value
-        System.out.println("READ VALUE:");
-        System.out.println(client.getAddressSpace().getVariableNode(nodeId).get().getValue().get());
+        //Read boolean value
+        System.out.println("READ BOOLEAN VALUE:");
+        boolean booleanOpcUa = (boolean)client.getAddressSpace().getVariableNode(booleanNode).get().getValue().get();
+        System.out.println(booleanOpcUa);
 
+
+        //Read array values
+        System.out.println("READ ARRAY VALUES:");
+        Float[] arrayOfFloatOpcUa = (Float[]) client.getAddressSpace().getVariableNode(arrayOfFloatNode).get().getValue().get();
+        List<Float> ListOfFloatOpcUa = List.of(arrayOfFloatOpcUa);
+        System.out.println(ListOfFloatOpcUa);
+
+        System.out.println("READ BOOLEAN DATA VALUE:");
         //Data value
-        System.out.println(client.readValue(0, TimestampsToReturn.Both,new NodeId(3,"Scalar_Static_Boolean")).get()); //Read directly
+        System.out.println(client.readValue(0, TimestampsToReturn.Both,booleanNode).get()); //Read directly
         System.out.println();
 
 
@@ -154,11 +190,29 @@ public class Main {
 //                .get();
 
 
-        float floatValue = 1f;
-        StatusCode statusCode = client.writeValue(new NodeId(3,"Scalar_Static_Float"),DataValue.valueOnly(new Variant(true))).get();
+        //WRITING VALUES
+        StatusCode statusCode;
+
+        //WRITING BOOLEAN VALUE
+        System.out.println("WRITE BOOLEAN VALUE");
+        statusCode = client.writeValue(booleanNode,DataValue.valueOnly(new Variant(true))).get();
         if(statusCode.isBad()){
             System.out.println("ERROR: "+statusCode);
+        }else{
+            System.out.println("OK: "+statusCode);
         }
+
+        //WRITING ARRAY OF FLOAT VALUES
+        System.out.println("WRITE ARRAY OF FLOAT VALUE");
+        Float[] arrayOfFloatWrite = {5f,4f,3f,2f,1f,0f};
+        statusCode = client.writeValue(arrayOfFloatNode,DataValue.valueOnly(new Variant(arrayOfFloatWrite))).get();
+        if(statusCode.isBad()){
+            System.out.println("ERROR: "+statusCode);
+        }else{
+            System.out.println("OK: "+statusCode);
+        }
+
+
 
 //        //Write value
 //        System.out.println("WRITE VALUE:");
