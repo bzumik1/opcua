@@ -11,6 +11,7 @@ import org.eclipse.milo.opcua.stack.core.AttributeId;
 import org.eclipse.milo.opcua.stack.core.Identifiers;
 import org.eclipse.milo.opcua.stack.core.UaException;
 import org.eclipse.milo.opcua.stack.core.types.builtin.*;
+import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.MessageSecurityMode;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.MonitoringMode;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.TimestampsToReturn;
@@ -30,10 +31,12 @@ import java.util.function.BiConsumer;
 import static org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned.uint;
 
 public class Main {
+    private static ArrayList<Double> arrayList= new ArrayList<>();
+
     public static void main(String[] args) throws ExecutionException, InterruptedException, UaException {
         //This will get all endpoints
         System.out.println("\n\nENDPOINTS:");
-        List<EndpointDescription> endpoints = DiscoveryClient.getEndpoints("opc.tcp://uademo.prosysopc.com:53530/OPCUA/SimulationServer").get();
+        List<EndpointDescription> endpoints = DiscoveryClient.getEndpoints("opc.tcp://localhost:50000").get();
         System.out.println("Number of endpoints = " + endpoints.size());
         endpoints.stream().forEach(System.out::println);
         System.out.println();
@@ -58,7 +61,13 @@ public class Main {
                                                     .setApplicationName(LocalizedText.english("Test of eclipse milo opc-ua client")) //shows in session
                                                     .setRequestTimeout(uint(5000))
                                                     .build();
+        OpcUaClientConfig opcUaConfiguration2 = OpcUaClientConfig.builder()
+                                                    .setEndpoint(oneOfEndpoints)
+                                                    .setApplicationName(LocalizedText.english("Test2 of eclipse milo opc-ua client")) //shows in session
+                                                    .setRequestTimeout(uint(5000))
+                                                    .build();
         OpcUaClient client = OpcUaClient.create(opcUaConfiguration);
+        OpcUaClient client2 = OpcUaClient.create(opcUaConfiguration2);
         //CONNECTING
         System.out.println("CONNECTING:");
         long startConnection;
@@ -72,6 +81,13 @@ public class Main {
         timeDifference = (float)(endConnection- startConnection)/1000;
         opcUaSession = client.getSession().get();
         System.out.println("First connection took: "+ timeDifference +" s. And SESSION ID is " + opcUaSession.getSessionId());
+
+        startConnection = System.currentTimeMillis();
+        client2.connect().get(); // only one connection is possible !!!
+        endConnection= System.currentTimeMillis();
+        timeDifference = (float)(endConnection- startConnection)/1000;
+        opcUaSession = client.getSession().get();
+        System.out.println("Another client connection took: "+ timeDifference +" s. And SESSION ID is " + opcUaSession.getSessionId());
 
         startConnection = System.currentTimeMillis();
         client.connect().get(); // only one connection is possible !!!
@@ -132,8 +148,9 @@ public class Main {
 
 
         //NODES
-        NodeId booleanNode = new NodeId(6,"Boolean");
-        NodeId arrayOfFloatNode = new NodeId(6,"FloatAnalogItemArray");
+        NodeId booleanNode = new NodeId(2,"AlternatingBoolean");
+        NodeId arrayOfIntegerNode = new NodeId(2,"FastUIntArray1");
+        NodeId subscriptionDoubleNode = new NodeId(2,"DipData");
 
         //Read boolean value
         System.out.println("READ BOOLEAN VALUE:");
@@ -143,9 +160,9 @@ public class Main {
 
         //Read array values
         System.out.println("READ ARRAY VALUES:");
-        Float[] arrayOfFloatOpcUa = (Float[]) client.getAddressSpace().getVariableNode(arrayOfFloatNode).get().getValue().get();
-        List<Float> ListOfFloatOpcUa = List.of(arrayOfFloatOpcUa);
-        System.out.println(ListOfFloatOpcUa);
+        UInteger[] arrayOfIntegerOpcUa = (UInteger[]) client.getAddressSpace().getVariableNode(arrayOfIntegerNode).get().getValue().get();
+        List<UInteger> ListOfIntegerOpcUa = List.of(arrayOfIntegerOpcUa);
+        System.out.println(ListOfIntegerOpcUa);
 
         System.out.println("READ BOOLEAN DATA VALUE:");
         //Data value
@@ -156,38 +173,7 @@ public class Main {
 
 
 
-//        //Subscribe
-//        // what to read
-//        ReadValueId readValueId = new ReadValueId(nodeId, AttributeId.Value.uid(), null, null);
-//
-//        // monitoring parameters
-//        int clientHandle = 123456789;
-//        MonitoringParameters parameters =
-//                new MonitoringParameters(uint(clientHandle), 1000.0, null, uint(10), true);
-//
-//
-//        // creation request
-//        MonitoredItemCreateRequest request =
-//                new MonitoredItemCreateRequest(readValueId, MonitoringMode.Reporting, parameters);
-//
-//        BiConsumer<UaMonitoredItem, DataValue> consumer =
-//                (item, value) ->
-//                        System.out.format("Changed happened: %s -> %s%n", item, value);
-//
-//        // setting the consumer after the subscription creation
-//        BiConsumer<UaMonitoredItem, Integer> onItemCreated =
-//                (monitoredItem, id) ->
-//                        monitoredItem.setValueConsumer(consumer);
-//
-//        // creating the subscription
-//        UaSubscription subscription =
-//                client.getSubscriptionManager().createSubscription(100.0).get();
-//
-//        List<UaMonitoredItem> items = subscription.createMonitoredItems(
-//                TimestampsToReturn.Both,
-//                Arrays.asList(request),
-//                onItemCreated)
-//                .get();
+
 
 
         //WRITING VALUES
@@ -203,9 +189,9 @@ public class Main {
         }
 
         //WRITING ARRAY OF FLOAT VALUES
-        System.out.println("WRITE ARRAY OF FLOAT VALUE");
-        Float[] arrayOfFloatWrite = {5f,4f,3f,2f,1f,0f};
-        statusCode = client.writeValue(arrayOfFloatNode,DataValue.valueOnly(new Variant(arrayOfFloatWrite))).get();
+        System.out.println("WRITE ARRAY OF UINT VALUE");
+        UInteger[] arrayOfFloatWrite = {UInteger.valueOf(1),UInteger.valueOf(2),UInteger.valueOf(3),UInteger.valueOf(4),UInteger.valueOf(5),UInteger.valueOf(6)};
+        statusCode = client.writeValue(arrayOfIntegerNode,DataValue.valueOnly(new Variant(arrayOfFloatWrite))).get();
         if(statusCode.isBad()){
             System.out.println("ERROR: "+statusCode);
         }else{
@@ -227,6 +213,72 @@ public class Main {
 
 
 
+
+
+
+
+
+
+        //Subscribe
+        // what to read
+        ReadValueId readValueId = new ReadValueId(subscriptionDoubleNode, AttributeId.Value.uid(), null, null);
+
+        // monitoring parameters
+        int clientHandle = 123456789; //random number
+        MonitoringParameters parameters =
+                new MonitoringParameters(uint(clientHandle), 10.0, null, uint(10), true);
+
+
+        // creation request
+        MonitoredItemCreateRequest request =
+                new MonitoredItemCreateRequest(readValueId, MonitoringMode.Reporting, parameters);
+
+        BiConsumer<UaMonitoredItem, DataValue> consumer =
+                (item, value) ->
+                        onChange(item,value);
+
+        // setting the consumer after the subscription creation
+        BiConsumer<UaMonitoredItem, Integer> onItemCreated =
+                (monitoredItem, id) ->
+                        monitoredItem.setValueConsumer(consumer);
+
+        // creating the subscription
+        UaSubscription subscription =
+                client.getSubscriptionManager().createSubscription(10.0).get();
+
+        List<UaMonitoredItem> items = subscription.createMonitoredItems(
+                TimestampsToReturn.Both,
+                Arrays.asList(request),
+                onItemCreated)
+                .get();
+
+        //Time to read values 1000s
+        Thread.sleep(1000000);
+
+
+
+
+
+
+
+    }
+    private static void onChange(UaMonitoredItem item, DataValue value){
+        String valueName = item.getReadValueId().getNodeId().getIdentifier().toString();
+        Double doubleValue = (Double)value.getValue().getValue();
+        if(arrayList.size()<=1000){
+            arrayList.add(doubleValue);
+        }else{
+            arrayList.remove(0);
+            arrayList.add(doubleValue);
+        }
+
+        Double sum = 0.0;
+        for(Double number:arrayList){
+            sum +=number;
+        }
+        Double average = sum/arrayList.size();
+
+        System.out.format("Changed happened: %s -> %s, average is %s\n", valueName , doubleValue,average);
 
     }
 }
